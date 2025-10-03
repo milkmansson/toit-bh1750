@@ -49,7 +49,7 @@ MTREG is the Measurement/Time (integration-time/sensitivity) register.  It can b
 ### Correction Factor
 The BH1750 is factory-calibrated for a typical light spectrum (roughly daylight, ~2856 K).  In practice the response of the sensor doesn’t perfectly match the human eye or all given specific light sources.  Therefore the driver contains a multiplier applied to the lux value from the device, called 'correction factor'.  This value can account for real-world conditions vs. default calibration.  By default this value is 1.2 (`CORRECTION-FACTOR-DEFAULT`), and valid range is 0.96 to 1.44. (`CORRECTION-FACTOR-MIN` to `CORRECTION-FACTOR-MAX`).
 #### Example:
-Under fluorescent or LED light, the reading can drift (often 10–20% off).  If the use case demands accuracy, obtaining a light reading from a known good device, this multipler can be used to correct the raw output.
+Under fluorescent or LED light, the reading can drift (often 10–20% off).  If the use case demands accuracy, obtain a light reading from a known good device and use this multipler to correct the raw output.
 #### Guidance:
 - 1.2 - makes the reading closer to the photopic curve of the human eye (driver default).
 - 1.0 - leaves uncorrected.

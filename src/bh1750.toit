@@ -10,35 +10,29 @@ import serial.registers as registers
 // Datasheet: https://www.mouser.com/datasheet/2/348/bh1750fvi-e-186247.pdf
 
 /**
-Driver for the BH1750 ambient light sensor.
+Driver for the BH1750 ambient light sensor.  See README.md.
 */
 class Bh1750:
   // Public
   static I2C-ADDRESS                 ::= 0x23
   static I2C-ADDRESS-ALT             ::= 0x5C
 
-  static POWER-DOWN_                 ::= 0b0000_0000
-  static POWER-ON_                   ::= 0b0000_0001
-
-  /** Reset data register value - not accepted in POWER_DOWN mode */
-  static RESET_                      ::= 0b0000_0111
-
-  /** 0.5 lx resolution - typically 120ms. */
+  /** 0.5 lx resolution - typically 120ms. Use with $set-mode. */
   static CONTINUOUS-HIGH-RES-MODE-2  ::= 0b0001_0001
 
-  /** 1.0 lx resolution - typically 120ms. */
+  /** 1.0 lx resolution - typically 120ms. Use with $set-mode. */
   static CONTINUOUS-HIGH-RES-MODE    ::= 0b0001_0000
 
-  /** 4.0 lx resolution - typicaly 16ms */
+  /** 4.0 lx resolution - typicaly 16ms Use with $set-mode. */
   static CONTINUOUS-LOW-RES-MODE     ::= 0b0001_0011
 
-  /** 0.5 lx resolution - typically 120ms - then power down. */
+  /** 0.5 lx resolution - typically 120ms - then power down. Use with $set-mode. */
   static ONE-TIME-HIGH-RES-MODE-2    ::= 0b0010_0001
 
-  /** 1.0 lx resolution - typically 120ms - then power down. */
+  /** 1.0 lx resolution - typically 120ms - then power down. Use with $set-mode. */
   static ONE-TIME-HIGH-RES-MODE      ::= 0b0010_0000
 
-  /** 4.0 lx resolution - typically 16ms - then power down. */
+  /** 4.0 lx resolution - typically 16ms - then power down. Use with $set-mode. */
   static ONE-TIME-LOW-RES-MODE       ::= 0b0010_0011
 
   static MTREG-DEFAULT               ::= 69.0
@@ -50,7 +44,14 @@ class Bh1750:
   static CORRECTION-FACTOR-MAX       ::= 1.44
 
 
-  // Private Variables
+  // Private
+
+  /** Reset data register value - not accepted in POWER_DOWN mode. */
+  static RESET_                      ::= 0b0000_0111
+
+  static POWER-OFF_                  ::= 0b0000_0000
+  static POWER-ON_                   ::= 0b0000_0001
+
   dev_/serial.Device       := ?
   logger_/log.Logger       := ?
   mode_/int                := 0
@@ -69,15 +70,21 @@ class Bh1750:
     set-mode CONTINUOUS-HIGH-RES-MODE
     set-mtreg MTREG-DEFAULT
 
-  /** Powers on the device */
+  /**
+  Powers on the device.
+  */
   power-on -> none:
     dev_.write #[POWER-ON_]
 
-  /** Powers off the device */
+  /**
+  Powers off the device.
+  */
   power-off -> none:
-    dev_.write #[POWER-DOWN_]
+    dev_.write #[POWER-OFF_]
 
-  /** Resets the device and clears values */
+  /**
+  Resets the device and clears values.
+  */
   reset -> none:
     dev_.write #[RESET_]
 
@@ -103,14 +110,17 @@ class Bh1750:
   set-mtreg mtreg/float -> none:
     assert: MTREG-MIN <= mtreg <= MTREG-MAX
     mtreg_ = mtreg
-    dev_.write #[(0b01000_000 | (mtreg_.to-int >> 5))]   // high bits
-    dev_.write #[(0b011_00000 | (mtreg_.to-int & 0x1F))] // low bits
+    dev_.write #[(0b01000_000 | (mtreg_.to-int >> 5))]   // high bits.
+    dev_.write #[(0b011_00000 | (mtreg_.to-int & 0x1F))] // low bits.
     recalculate-wait-time-ms_
-    dev_.write #[mode_]                                  // Ensures effective immediately
+    dev_.write #[mode_]               // Ensures effective immediately.
     stale_ = true
 
   /**
   Gets the Measurement/Time (integration-time/sensitivity) register. See README.md.
+
+  This value cannot be retrieved from the register, so is returned from the
+  class private variable.
   */
   get-mtreg -> float:
     return mtreg_
@@ -125,12 +135,12 @@ class Bh1750:
     stale_ = true
 
   /**
-  Returns ambient light level
+  Returns ambient light level.
 
-  Takes care of issues such as priming and the specific mode requiring / 2
+  Takes care of issues such as priming and the specific mode requiring / 2.
   */
   read-lux -> float:
-    // If config changed (stale_=true) prime by reading once
+    // If config changed (stale_=true) prime by reading once.
     if stale_:
       if mode_ == ONE-TIME-HIGH-RES-MODE
           or mode_ == ONE-TIME-HIGH-RES-MODE-2
@@ -159,20 +169,20 @@ class Bh1750:
     return lux
 
   /**
-  Recalculates the wait time for a read and stores in class variable
+  Recalculates the wait time for a read and stores in class variable.
   */
   recalculate-wait-time-ms_ -> none:
     // Wait for integration to complete.
     base-ms := (mode_ == CONTINUOUS-LOW-RES-MODE or mode_ == ONE-TIME-LOW-RES-MODE) ? 16 : 120
 
-    // Scale time by mtreg_/69.0 (DEFAULT)
+    // Scale time by mtreg_/69.0 (DEFAULT).
     scale/float := mtreg_ / MTREG-DEFAULT
     time-ms/int := (base-ms * scale).ceil.to-int
 
-    // Enforce minimums
+    // Enforce minimums.
     if time-ms < 16: time-ms = 16
-    // Hi-res modes can take up to ~180 ms per datasheet; give them headroom
+    // Hi-res modes can take up to ~180 ms per datasheet; give them headroom.
     if (base-ms >= 120) and (time-ms < 180): time-ms = 180
 
-    // Store the value
+    // Store the value.
     wait-time-ms_ = time-ms

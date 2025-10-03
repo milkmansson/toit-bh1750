@@ -1,0 +1,3 @@
+dependencies:
+  bh1750:
+    path: ..

@@ -1,0 +1,5 @@
+prefixes:
+  bh1750: ..
+packages:
+  ..:
+    path: ..

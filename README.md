@@ -40,11 +40,11 @@ Considering the power draw of the ESP32 platform, these values may not be signif
 
 ## Other Features
 ### MTREG
-MTREG is the Measurement/Time (integration-time/sensitivity) register.  It can be set between 31.0 (`MTREG-MIN`) and 254.0 (`MTREG-MAX`).  (Default is 69 `MTREG-DEFAULT`)
+MTREG is the Measurement/Time (integration-time/sensitivity) register.  It can be set between 31.0 (`MTREG-MIN`) and 254.0 (`MTREG-MAX`).  (Default is 69 `MTREG-DEFAULT`).  Use the functions `set-mtreg` to set MTREG.  The driver caches the value to use in lux calculations, and can be retrieved by `get-mtreg`. (It can not be retrieved from the device.)
 #### Guidance:
 - Bigger MTREG  = longer exposure  = higher sensitivity.  Better in the dark, but lower max lux before the 16-bit register saturates.  Use when indoors or in dim environments: raise MTREG (e.g., 138–200) for smoother, less noisy readings.
 - Smaller MTREG = shorter exposure = lower sensitivity.  Better in bright light, and higher max lux, but less sensitive. Use when Outdoors/bright/near windows: lower the MTREG (e.g., 40–69) to avoid clipping and speed up reads.
-Use the functions `set-mtreg` to set this.  The driver caches the value to use in lux calculations.  This can be retrieved by `get-mtreg`.
+
 
 ### Correction Factor
 The BH1750 is factory-calibrated for a typical light spectrum (roughly daylight, ~2856 K).  In practice the response of the sensor doesn’t perfectly match the human eye or all given specific light sources.  Therefore the driver contains a multiplier applied to the lux value from the device, called 'correction factor'.  This value can account for real-world conditions vs. default calibration.  By default this value is 1.2 (`CORRECTION-FACTOR-DEFAULT`), and valid range is 0.96 to 1.44. (`CORRECTION-FACTOR-MIN` to `CORRECTION-FACTOR-MAX`).

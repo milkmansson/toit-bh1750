@@ -12,7 +12,8 @@ The device operates in two modes:
 The sensor keeps measuring lux continuously and updating its data register.
   - A reading can be made at any time.
   - Power consumption is higher since it never stops measuring.
-  - Useful for real-time, frequent updates (e.g. dimming a display continuously as light changes).
+  - Useful for real-time, frequent updates (e.g. dimming a display continuously
+    as light changes).
 
 Continuous Modes:
   - Continuous High Resolution (~1 lux resolution, ~120 ms measurement time)
@@ -23,7 +24,8 @@ Continuous Modes:
 The sensor makes a single measurement, puts the result into the data register,
 and then goes into power-down automatically.
 - Consumes less power since it’s off when not measuring.
-- The mode command must be sent again each time a new reading is required. (Handled by this driver)
+- The mode command must be sent again each time a new reading is required.
+  (Handled by this driver)
 - Good for battery-powered devices where you only need periodic light checks.
 
 One-Time Modes (same as for Continuous):
@@ -103,7 +105,8 @@ See Examples folder
 
 ## Issues
 If there are any issues, changes, or any other kind of feedback, please
-[raise an issue](toit-ina3221/issues). Feedback is welcome and appreciated!
+[raise an issue](https://github.com/milkmansson/toit-bh1750/issues). Feedback is
+welcome and appreciated!
 
 ## Disclaimer
 - All trademarks belong to their respective owners.

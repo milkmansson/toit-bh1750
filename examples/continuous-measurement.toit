@@ -19,7 +19,7 @@ main:
   scandevices := bus.scan
 
   if not scandevices.contains Bh1750.I2C-ADDRESS:
-    print "No MPR121 device found [0x$(%02x Bh1750.I2C-ADDRESS)]"
+    print "No Bh1750 device found [0x$(%02x Bh1750.I2C-ADDRESS)]"
   else:
     bh1750-device := bus.device Bh1750.I2C-ADDRESS
     bh1750-driver := Bh1750 bh1750-device

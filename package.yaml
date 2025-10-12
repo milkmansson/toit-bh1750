@@ -2,3 +2,6 @@ name: bh1750
 description: Support for bh1750 - an I2C based ambient light sensor IC.
 environment:
   sdk: ^2.0.0-alpha.188
+dependencies:
+  ema:
+    path: ../toit-ema/

@@ -1,5 +1,10 @@
 prefixes:
   bh1750: ..
+  ema: toit-ema
 packages:
   ..:
     path: ..
+    prefixes:
+      ema: toit-ema
+  toit-ema:
+    path: ../../toit-ema

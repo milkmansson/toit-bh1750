@@ -3,14 +3,13 @@
 // in the LICENSE file.
 
 import log
-import binary
 import serial.device as serial
-import serial.registers as registers
-
-// Datasheet: https://www.mouser.com/datasheet/2/348/bh1750fvi-e-186247.pdf
+import ema show *
 
 /**
 Driver for the BH1750 ambient light sensor.  See README.md.
+
+Datasheet: https://www.mouser.com/datasheet/2/348/bh1750fvi-e-186247.pdf
 */
 class Bh1750:
   // Public
@@ -43,6 +42,20 @@ class Bh1750:
   static CORRECTION-FACTOR-MIN       ::= 0.96
   static CORRECTION-FACTOR-MAX       ::= 1.44
 
+  static AUTORANGING-ALPHA           ::= 0.37
+  static AUTORANGING-CONSECUTIVE     ::= 5
+  static AUTORANGING-HOLD-DOWN       ::= (Duration --s=2)
+
+  static AUTORANGING-BRIGHT-OUTDOOR-MTREG  ::= 32.0
+  static AUTORANGING-BRIGHT-ON-LUX         ::= 45000.0  // enter bright when >= this
+  static AUTORANGING-BRIGHT-OFF-LUX        ::= 38000.0  // leave bright when <= this
+  static AUTORANGING-DEFAULT-GENERAL-MTREG ::= MTREG-DEFAULT
+  static AUTORANGING-LOW-LIGHT-MTREG       ::= 138.0
+  static AUTORANGING-LOW-ON-LUX            ::= 9.0      // enter low band when <= this
+  static AUTORANGING-LOW-OFF-LUX           ::= 12.0     // leave low band when >= this
+
+  // Bright/outdoor band (go to low MTREG to avoid saturation):
+
 
   // Private
 
@@ -59,10 +72,17 @@ class Bh1750:
   wait-time-ms_/int        := 0
   stale_/bool              := false
   correction-factor_/float := 0.0
+  autoranging_/bool        := false
+  ema_/Ema                 := ?
+  last-mtreg-change_/int   := 0
+  bright-count_/int   := 0
+  normal-count_/int   := 0
+  low-count_/int      := 0
 
-  constructor device/serial.Device --logger/log.Logger=(log.default.with-name "bh1750"):
-    logger_       = logger
-    dev_          = device
+  constructor device/serial.Device --logger/log.Logger=log.default:
+    logger_ = logger.with-name "bh1750"
+    dev_ = device
+    ema_ = Ema --alpha=AUTORANGING-ALPHA
     recalculate-wait-time-ms_
     power-on
     reset
@@ -113,6 +133,7 @@ class Bh1750:
     dev_.write #[(0b01000_000 | (mtreg_.to-int >> 5))]   // high bits.
     dev_.write #[(0b011_00000 | (mtreg_.to-int & 0x1F))] // low bits.
     recalculate-wait-time-ms_
+    last-mtreg-change_ = Time.monotonic-us
     dev_.write #[mode_]               // Ensures effective immediately.
     stale_ = true
 
@@ -166,6 +187,10 @@ class Bh1750:
       lux /= 2.0
 
     //logger_.debug "read-lux: measured $(lux) lux"
+    if autoranging_:
+      ema_.add lux
+      auto-range_
+
     return lux
 
   /**
@@ -186,3 +211,93 @@ class Bh1750:
 
     // Store the value.
     wait-time-ms_ = time-ms
+
+
+  enable-autoranging alpha/float=AUTORANGING-ALPHA -> none:
+    assert: 0 < alpha <= 1.0
+    logger_.info "Autoranging enabled." --tags={"alpha" : alpha}
+    ema_.reset
+    ema_.set-alpha alpha
+    autoranging_ = true
+
+  disable-autoranging -> none:
+    logger_.info "Autoranging disabled."
+    ema_.reset
+    autoranging_ = false
+
+  read-moving-average -> float:
+    return ema_.average
+
+  auto-range_ -> none:
+    // Check if holddown is exceeded
+    if Time.monotonic-us < (last-mtreg-change_ + AUTORANGING-HOLD-DOWN.in-us):
+      //logger_.warn "auto-range_: in holddown"
+      return
+
+    if ema_.average == null:
+      logger_.error "auto-range_: average is null"
+      return
+
+    //if ema_.samples <= 5:
+    //  logger_.warn "auto-range_: not enough initial samples."
+    //  return
+
+    // Low band: very dark
+    if ema_.average <= AUTORANGING-LOW-ON-LUX:
+      low-count_ += 1
+    else:
+      low-count_ = 0
+
+
+    // Bright band: very bright
+    if ema_.average >= AUTORANGING-BRIGHT-ON-LUX:
+      bright-count_ += 1
+    else:
+      bright-count_ = 0
+
+    // Normal band: between low-off and bright-off
+    if (ema_.average >= AUTORANGING-LOW-OFF-LUX) and (ema_.average <= AUTORANGING-BRIGHT-OFF-LUX):
+      normal-count_ += 1
+    else:
+      normal-count_ = 0
+
+    // Bright/outdoor band
+    if bright-count_ >= AUTORANGING_CONSECUTIVE and mtreg_ != AUTORANGING-BRIGHT-OUTDOOR-MTREG:
+      set-mtreg AUTORANGING-BRIGHT-OUTDOOR-MTREG
+      logger_.debug "auto-range_: Switched to Bright Outdoor (mtreg=$AUTORANGING-BRIGHT-OUTDOOR-MTREG)"
+      // Reset dwell and restart holddown
+      bright-count_ = 0
+      low-count_ = 0
+      normal-count_ = 0
+      return
+
+    // Low-light band
+    if low-count_ >= AUTORANGING_CONSECUTIVE and mtreg_ != AUTORANGING-LOW-LIGHT-MTREG:
+      set-mtreg AUTORANGING-LOW-LIGHT-MTREG
+      logger_.debug "auto-range_: Switched to Low Light (mtreg=$AUTORANGING-LOW-LIGHT-MTREG)"
+      bright-count_ = 0
+      low-count_ = 0
+      normal-count_ = 0
+      return
+
+    // Back to default/indoor (only when safely in the middle band)
+    if normal-count_ >= AUTORANGING_CONSECUTIVE and mtreg_ != AUTORANGING-DEFAULT-GENERAL-MTREG:
+      set-mtreg AUTORANGING-DEFAULT-GENERAL-MTREG
+      logger_.debug "auto-range_: Switched to Low Light (mtreg=$AUTORANGING-DEFAULT-GENERAL-MTREG)"
+      bright-count_ = 0
+      low-count_ = 0
+      normal-count_ = 0
+      return
+
+
+/*
+    // Add hysteresis + dwell so you don’t chatter:
+    // Go down a band only if lux > 45_000 for N=5 consecutive samples.
+    // Go up a band only if lux < 8 for N=5 consecutive samples.
+    // Return to default if 12 ≤ lux ≤ 38_000 for N=5 samples.
+
+    if ema_.average > 45000:  set-mtreg 32.0 // Bright/outdoor
+    if ema_.average > limit:  set-mtreg 69.0   // Default/indoor general
+
+    if 12 <= ema_.value <= 38000:  set-mtreg AUTORANGING-DEFAULT-GENERAL
+*/

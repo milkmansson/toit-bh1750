@@ -1,3 +1,5 @@
 dependencies:
   bh1750:
     path: ..
+  ema:
+    path: ../../toit-ema/

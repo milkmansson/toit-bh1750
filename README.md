@@ -106,7 +106,6 @@ If there are any issues, changes, or any other kind of feedback, please
 [raise an issue](toit-ina3221/issues). Feedback is welcome and appreciated!
 
 ## Disclaimer
-- This driver has been written and tested with an unbranded INA226 module.
 - All trademarks belong to their respective owners.
 - No warranties for this work, express or implied.
 

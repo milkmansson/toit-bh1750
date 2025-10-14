@@ -1,5 +1,5 @@
 name: bh1750
-description: Support for the Rohm Semi BH1750 Ambient Light Sensor.
+description: Support for the Rohm Semi BH1750 Ambient Light Sensor.  Supports manual and autoranging MTREG configuration.
 environment:
   sdk: ^2.0.0-alpha.188
 dependencies:
